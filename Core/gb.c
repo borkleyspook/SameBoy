@@ -1254,22 +1254,9 @@ uint32_t *GB_get_pixels_output(GB_gameboy_t *gb)
     return gb->screen;
 }
 
-void GB_set_pixels_output(GB_gameboy_t *gb, uint32_t *output)
-{
-    gb->screen = output;
-}
-
 void GB_set_bg_pixels_output(GB_gameboy_t *gb, uint32_t *output)
 {
     gb->bg_screen = output;
-}
-
-void GB_set_vblank_callback(GB_gameboy_t *gb, GB_vblank_callback_t callback)
-{
-    if (!callback) {
-        GB_ASSERT_NOT_RUNNING_OTHER_THREAD(gb)
-    }
-    gb->vblank_callback = callback;
 }
 
 void GB_set_log_callback(GB_gameboy_t *gb, GB_log_callback_t callback)

@@ -5,7 +5,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <math.h>
 #include <time.h>
 

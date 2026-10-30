@@ -776,9 +776,9 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         }
     }
     
-    WGB_update_hardware_values(&wgb, gb.io_registers[GB_IO_SCX], gb.io_registers[GB_IO_SCY],
-                                 gb.io_registers[GB_IO_WX], gb.io_registers[GB_IO_WY],
-                                 gb.io_registers[GB_IO_LCDC] & 0x20);
+    // WGB_update_hardware_values(&wgb, gb->io_registers[GB_IO_SCX], gb->io_registers[GB_IO_SCY],
+    //                          gb->io_registers[GB_IO_WX], gb->io_registers[GB_IO_WY],
+    //                          gb->io_registers[GB_IO_LCDC] & 0x20);
     WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode);
     
     do_rewind = rewind_down;
@@ -1185,7 +1185,7 @@ restart:;
         GB_set_pixels_output(&gb, active_pixel_buffer);
         char wgb_path[strlen(filename) + 8];
         replace_extension(filename, strlen(filename), wgb_path, ".widegb");
-        wgb = WGB_init_from_path(wgb_path, rgb_encode);
+        wgb = WGB_init_from_path(wgb_path, (WGB_rgb_encode_callback_t) rgb_encode);
         GB_set_bg_pixels_output(&gb, active_pixel_buffer);
         GB_set_rgb_encode_callback(&gb, rgb_encode);
         GB_set_rumble_callback(&gb, rumble);
