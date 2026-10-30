@@ -52,6 +52,7 @@ static SDL_Surface *wgb_screen_surface = NULL;
 static SDL_Surface *wgb_tile_surfaces[WIDE_GB_MAX_TILES];
 static SDL_Texture *wgb_texture = NULL;
 static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
+static bool widescreen_rendering = false;
 
 bool screen_manually_resized = false;
 
@@ -236,6 +237,21 @@ static void render_widescreen(void *pixels)
         .h = surface_height * (int)scale,
     };
 
+    /* Debug aid: set SAMEBoy_WGB_DUMP=<prefix> to dump composed frames. */
+    {
+        static unsigned dump_count = 0;
+        static unsigned frame_count = 0;
+        const char *dump_prefix = getenv("SAMEBoy_WGB_DUMP");
+        frame_count++;
+        if (dump_prefix && dump_prefix[0] && dump_count < 64 && (frame_count % 120) == 0) {
+            char dump_path[1024];
+            snprintf(dump_path, sizeof(dump_path), "%s_%03u_win%dx%d_surf%dx%d_scale%u.bmp",
+                     dump_prefix, dump_count++, window_width, window_height,
+                     surface_width, surface_height, scale);
+            SDL_SaveBMP(wgb_surface, dump_path);
+        }
+    }
+
     if (renderer) {
         if (wgb_texture == NULL ||
             wgb_texture_width != (unsigned)surface_width ||
@@ -274,8 +290,16 @@ static void render_widescreen(void *pixels)
 void render_texture(void *pixels,  void *previous)
 {
     if (can_render_widescreen()) {
+        widescreen_rendering = true;
         render_widescreen(pixels);
         return;
+    }
+
+    if (widescreen_rendering) {
+        /* The widescreen compositor uses the whole window as its viewport;
+           restore the regular letterboxed viewport when leaving the mode. */
+        widescreen_rendering = false;
+        update_viewport();
     }
 
     if (renderer) {

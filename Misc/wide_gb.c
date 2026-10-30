@@ -298,21 +298,31 @@ void WGB_load_tile_from_file(WGB_tile *tile, char *path, WGB_rgb_encode_callback
 {
     // Load RGB buffer from file
     uint8_t rgb_pixels[160 * 144 * 3];
-    FILE *ppm_file = fopen(path, "r");
+    FILE *ppm_file = fopen(path, "rb");
+    if (ppm_file == NULL) {
+        fprintf(stderr, "wgb: failed to load file at '%s': cannot open file\n", path);
+        return;
+    }
 
     // Check image dimensions
     int ppm_width, ppm_height;
-    while (fgetc(ppm_file) != '\n') ; // skip header
-    fscanf(ppm_file, "%d %d\n", &ppm_width, &ppm_height);
+    while (fgetc(ppm_file) != '\n' && !feof(ppm_file)) ; // skip header
+    if (fscanf(ppm_file, "%d %d\n", &ppm_width, &ppm_height) != 2) {
+        fprintf(stderr, "wgb: failed to load file at '%s': invalid header\n", path);
+        fclose(ppm_file);
+        return;
+    }
     if (ppm_width != 160 || ppm_height != 144) {
         fprintf(stderr, "wgb: failed to load file at '%s': invalid dimensions (width: %i, height: %i)\n", path, ppm_width, ppm_height);
+        fclose(ppm_file);
         return;
     }
 
     // Read pixel data
-    while (fgetc(ppm_file) != '\n'); // skip pixel format
+    while (fgetc(ppm_file) != '\n' && !feof(ppm_file)); // skip pixel format
     if (fread(rgb_pixels, 3, 160 * 144, ppm_file) != 160 * 144) {
         fprintf(stderr, "wgb: failed to load file at '%s': file is too short\n", path);
+        fclose(ppm_file);
         return;
     }
 

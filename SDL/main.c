@@ -721,6 +721,14 @@ static void __attribute__((unused)) rgb_decode(uint32_t encoded, uint8_t *r, uin
     SDL_GetRGB(encoded, pixel_format, (Uint8 *)r, (Uint8 *)g, (Uint8 *)b);
 }
 
+/* WideGB's encode callback takes exactly (r, g, b), unlike SameBoy's
+   4-argument rgb_encode. Casting the latter to the former shifts every
+   argument (and leaves blue uninitialized), so use a real wrapper. */
+static uint32_t wgb_rgb_encode(uint8_t r, uint8_t g, uint8_t b)
+{
+    return SDL_MapRGB(pixel_format, r, g, b);
+}
+
 static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
 {
     if (underclock_down && clock_mutliplier > 0.5) {
@@ -1195,7 +1203,7 @@ restart:;
         GB_set_pixels_output(&gb, active_pixel_buffer);
         char wgb_path[strlen(filename) + 8];
         replace_extension(filename, strlen(filename), wgb_path, ".widegb");
-        WGB_init_from_path(&wgb, wgb_path, (WGB_rgb_encode_callback_t) rgb_encode);
+        WGB_init_from_path(&wgb, wgb_path, wgb_rgb_encode);
         GB_set_bg_pixels_output(&gb, bg_pixel_buffer);
         GB_set_rgb_encode_callback(&gb, rgb_encode);
         GB_set_rumble_callback(&gb, rumble);
