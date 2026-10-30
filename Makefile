@@ -291,7 +291,7 @@ endif
 
 ifeq ($(PLATFORM),windows32)
 CFLAGS += -IWindows -Drandom=rand --target=x86_64-pc-windows
-LDFLAGS += -lmsvcrt -lkernel32 -Wl,/MANIFESTFILE:NUL --target=x86_64-pc-windows
+LDFLAGS += -lmsvcrt -lkernel32 -Wl,/MANIFESTFILE:NUL -Wl,/STACK:0x1000000 --target=x86_64-pc-windows
 SDL_LDFLAGS := -lSDL2 -lcomdlg32 -luser32 -lshell32 -lole32 -ladvapi32 -ldwmapi -lwindowscodecs -lSDL2main
 GL_LDFLAGS := -lopengl32 
 ifneq ($(REDIST_XAUDIO),)
@@ -719,7 +719,7 @@ endif
 # Copy required DLL files for the Windows port
 $(BIN)/SDL/%.dll:
 	-@$(MKDIR) -p $(dir $@)
-	@$(eval MATCH := $(shell where "$(lib)":$(notdir $@)))
+	@$(eval MATCH := $(firstword $(wildcard $(LIB)/$(notdir $@))))
 	cp "$(MATCH)" $@
 
 # Tester

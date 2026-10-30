@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -90,9 +91,9 @@ void WGB_scene_destroy(WGB_scene *scene)
     scene->tiles_count = 0;
 }
 
-wide_gb WGB_init_from_path(const char *save_path, WGB_rgb_encode_callback_t rgb_encode)
+void WGB_init_from_path(wide_gb *wgb, const char *save_path, WGB_rgb_encode_callback_t rgb_encode)
 {
-    wide_gb wgb = { 0 };
+    memset(wgb, 0, sizeof(*wgb));
     int max_scene_id = 0;
 
     // For each item in save_path…
@@ -113,7 +114,7 @@ wide_gb WGB_init_from_path(const char *save_path, WGB_rgb_encode_callback_t rgb_
         sscanf(save_dirent->d_name, "scene_%i", &scene_id);
 
         // Create a new scene
-        WGB_scene *scene = WGB_create_scene(&wgb);
+        WGB_scene *scene = WGB_create_scene(wgb);
         scene->id = scene_id;
         max_scene_id = MAX(scene->id, max_scene_id);
 
@@ -136,7 +137,7 @@ wide_gb WGB_init_from_path(const char *save_path, WGB_rgb_encode_callback_t rgb_
             sscanf(scene_dirent->d_name, "tile_%i_%i", &position.horizontal, &position.vertical);
 
             // Create a new tile for the scene
-            WGB_tile *tile = WGB_create_tile(&wgb, scene, position);
+            WGB_tile *tile = WGB_create_tile(wgb, scene, position);
 
             // Restore the tile pixel buffer from the file
             char tile_path[save_path_len + 50];
@@ -163,7 +164,7 @@ wide_gb WGB_init_from_path(const char *save_path, WGB_rgb_encode_callback_t rgb_
                 sscanf(line, "%llu,%i,%i,%i", &frame_hash, &scene_id, &scene_scroll.x, &scene_scroll.y);
 
                 // Create a new scene frame
-                WGB_store_frame_hash(&wgb, frame_hash, scene_id, scene_scroll);
+                WGB_store_frame_hash(wgb, frame_hash, scene_id, scene_scroll);
             }
             fclose(frames_file);
         }
@@ -173,13 +174,10 @@ wide_gb WGB_init_from_path(const char *save_path, WGB_rgb_encode_callback_t rgb_
     save_dir != NULL && closedir(save_dir);
 
     // Ensure scene ids created for now won't overlap with restored scenes
-    wgb.next_scene_id = max_scene_id + 1;
+    wgb->next_scene_id = max_scene_id + 1;
 
     // Create a new blank active scene
-    wgb.active_scene = WGB_create_scene(&wgb);
-
-    // Return
-    return wgb;
+    wgb->active_scene = WGB_create_scene(wgb);
 }
 
 void WGB_save_to_path(wide_gb *wgb, const char *save_path, WGB_rgb_decode_callback_t rgb_decode)
