@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -729,6 +730,32 @@ static uint32_t wgb_rgb_encode(uint8_t r, uint8_t g, uint8_t b)
     return SDL_MapRGB(pixel_format, r, g, b);
 }
 
+/* Debug helper: dump a 160x144 buffer as a binary PPM. Enabled only when
+   SAMEBoy_WGB_DUMP_BG is set, so it costs nothing in normal runs. */
+static void wgb_debug_dump_ppm(const char *prefix, unsigned index, const char *kind,
+                               const uint32_t *pixels)
+{
+    char path[1024];
+    snprintf(path, sizeof(path), "%s_%02u_%s.ppm", prefix, index, kind);
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        return;
+    }
+    fprintf(file, "P6\n160 144\n255\n");
+    uint8_t row[160 * 3];
+    for (unsigned y = 0; y < 144; y++) {
+        for (unsigned x = 0; x < 160; x++) {
+            uint8_t r, g, b;
+            SDL_GetRGB(pixels[x + y * 160], pixel_format, &r, &g, &b);
+            row[x * 3 + 0] = r;
+            row[x * 3 + 1] = g;
+            row[x * 3 + 2] = b;
+        }
+        fwrite(row, 3, 160, file);
+    }
+    fclose(file);
+}
+
 static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
 {
     if (underclock_down && clock_mutliplier > 0.5) {
@@ -784,6 +811,27 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
                                      io_registers[GB_IO_WX] - 7, io_registers[GB_IO_WY],
                                      io_registers[GB_IO_LCDC] & 0x20);
         WGB_update_screen(&wgb, bg_pixel_buffer, rgb_decode);
+
+        {
+            static unsigned wgb_debug_counter = 0;
+            const char *wgb_debug_prefix = getenv("SAMEBoy_WGB_DUMP_BG");
+            if (wgb_debug_prefix && wgb_debug_prefix[0] && wgb_debug_counter < 60) {
+                if ((wgb_debug_counter % 6) == 0) {
+                    unsigned dump_index = wgb_debug_counter / 6;
+                    wgb_debug_dump_ppm(wgb_debug_prefix, dump_index, "bg", bg_pixel_buffer);
+                    wgb_debug_dump_ppm(wgb_debug_prefix, dump_index, "disp", active_pixel_buffer);
+                    fprintf(stderr, "wgbdebug %u scene=%d scroll=%d,%d tiles=%zu window=%d "
+                                    "rect=%d,%d,%d,%d sgb=%d\n",
+                            dump_index, wgb.active_scene ? wgb.active_scene->id : -1,
+                            wgb.active_scene ? wgb.active_scene->scroll.x : 0,
+                            wgb.active_scene ? wgb.active_scene->scroll.y : 0,
+                            wgb.active_scene ? wgb.active_scene->tiles_count : 0,
+                            wgb.window_enabled, wgb.window_rect.x, wgb.window_rect.y,
+                            wgb.window_rect.w, wgb.window_rect.h, gb->sgb != NULL);
+                }
+                wgb_debug_counter++;
+            }
+        }
     }
     
     if (type != GB_VBLANK_TYPE_REPEAT) {
