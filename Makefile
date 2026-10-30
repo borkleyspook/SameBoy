@@ -690,9 +690,9 @@ ifeq ($(CONF), release)
 	$(CODESIGN) $@
 endif
 
-$(BIN)/SDL/sameboy.exe: $(CORE_OBJECTS) $(SDL_OBJECTS)
+$(BIN)/SDL/sameboy.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Misc/wide_gb.c.o
 	-@$(MKDIR) -p $(dir $@)
-	$(CC) $(CORE_OBJECTS) $(SDL_OBJECTS) -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:windows
+	$(CC) $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Misc/wide_gb.c.o -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:windows
 	
 $(BIN)/SDL/sameboy_debugger.txt:
 	echo Looking for sameboy_debugger.exe? > $@

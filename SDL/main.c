@@ -712,7 +712,7 @@ static uint32_t rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
     return SDL_MapRGB(pixel_format, r, g, b);
 }
 
-static void rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
+static void __attribute__((unused)) rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
 {
     SDL_GetRGB(encoded, pixel_format, (Uint8 *)r, (Uint8 *)g, (Uint8 *)b);
 }
@@ -776,10 +776,10 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         }
     }
     
-    // WGB_update_hardware_values(&wgb, gb->io_registers[GB_IO_SCX], gb->io_registers[GB_IO_SCY],
-    //                          gb->io_registers[GB_IO_WX], gb->io_registers[GB_IO_WY],
-    //                          gb->io_registers[GB_IO_LCDC] & 0x20);
-    WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode);
+    /* WGB_update_hardware_values(&wgb, gb->registers[GB_IO_SCX], gb->registers[GB_IO_SCY],
+                                 gb->registers[GB_IO_WX], gb->registers[GB_IO_WY],
+                                 gb->registers[GB_IO_LCDC] & 0x20); */
+    /* WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode); */
     
     do_rewind = rewind_down;
     
