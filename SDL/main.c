@@ -13,6 +13,7 @@
 #include "gui.h"
 #include "shader.h"
 #include "audio/audio.h"
+#include "Misc/wide_gb.h"
 #include "console.h"
 #include "save_png/save_png.h"
 
@@ -31,6 +32,7 @@ static bool rapid_a = false, rapid_b = false;
 static uint8_t rapid_a_count = 0, rapid_b_count = 0;
 static double clock_mutliplier = 1.0;
 static bool pending_screenshot = false;
+wide_gb wgb;
 
 char *filename = NULL;
 static typeof(free) *free_function = NULL;
@@ -710,6 +712,11 @@ static uint32_t rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
     return SDL_MapRGB(pixel_format, r, g, b);
 }
 
+static void rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    SDL_GetRGB(encoded, pixel_format, (Uint8 *)r, (Uint8 *)g, (Uint8 *)b);
+}
+
 static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
 {
     if (underclock_down && clock_mutliplier > 0.5) {
@@ -768,6 +775,12 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
             render_texture(active_pixel_buffer, NULL);
         }
     }
+    
+    WGB_update_hardware_values(&wgb, gb.io_registers[GB_IO_SCX], gb.io_registers[GB_IO_SCY],
+                                 gb.io_registers[GB_IO_WX], gb.io_registers[GB_IO_WY],
+                                 gb.io_registers[GB_IO_LCDC] & 0x20);
+    WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode);
+    
     do_rewind = rewind_down;
     
     battery_timer++;
@@ -1170,6 +1183,10 @@ restart:;
         GB_set_boot_rom_load_callback(&gb, load_boot_rom);
         GB_set_vblank_callback(&gb, (GB_vblank_callback_t) vblank);
         GB_set_pixels_output(&gb, active_pixel_buffer);
+        char wgb_path[strlen(filename) + 8];
+        replace_extension(filename, strlen(filename), wgb_path, ".widegb");
+        wgb = WGB_init_from_path(wgb_path, rgb_encode);
+        GB_set_bg_pixels_output(&gb, active_pixel_buffer);
         GB_set_rgb_encode_callback(&gb, rgb_encode);
         GB_set_rumble_callback(&gb, rumble);
         GB_set_rumble_mode(&gb, configuration.rumble_mode);
