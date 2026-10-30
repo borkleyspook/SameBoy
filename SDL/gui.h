@@ -2,6 +2,7 @@
 
 #include <SDL.h>
 #include <Core/gb.h>
+#include <Misc/wide_gb.h>
 #include <stdbool.h> 
 #include "shader.h"
 #include "configuration.h"
@@ -16,6 +17,7 @@
 #endif
 
 extern GB_gameboy_t gb;
+extern wide_gb wgb;
 
 extern SDL_Window *window;
 extern SDL_Renderer *renderer;

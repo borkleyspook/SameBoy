@@ -27,6 +27,10 @@ GB_gameboy_t gb;
 static bool paused = false;
 static uint32_t pixel_buffer_1[256 * 224], pixel_buffer_2[256 * 224];
 static uint32_t *active_pixel_buffer = pixel_buffer_1, *previous_pixel_buffer = pixel_buffer_2;
+/* WideGB records background pixels, which are always laid out as 160x144
+   regardless of the border mode. Keep them separate from the displayed
+   buffer so sprites/window/OSD never end up in recorded tiles. */
+static uint32_t bg_pixel_buffer[WIDE_GB_TILE_WIDTH * WIDE_GB_TILE_HEIGHT];
 static bool underclock_down = false, rewind_down = false, do_rewind = false, rewind_paused = false, turbo_down = false;
 static bool rapid_a = false, rapid_b = false;
 static uint8_t rapid_a_count = 0, rapid_b_count = 0;
@@ -763,6 +767,17 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         }
         osd_countdown--;
     }
+    if (type != GB_VBLANK_TYPE_REPEAT && type != GB_VBLANK_TYPE_LCD_OFF) {
+        /* Notify WideGB of the frame that was just finished, before the
+           pixel buffers are swapped. It needs the background pixels (not the
+           composited display buffer) so window/sprites are not recorded. */
+        uint8_t *io_registers = GB_get_direct_access(gb, GB_DIRECT_ACCESS_IO, NULL, NULL);
+        WGB_update_hardware_values(&wgb, io_registers[GB_IO_SCX], io_registers[GB_IO_SCY],
+                                     io_registers[GB_IO_WX] - 7, io_registers[GB_IO_WY],
+                                     io_registers[GB_IO_LCDC] & 0x20);
+        WGB_update_screen(&wgb, bg_pixel_buffer, rgb_decode);
+    }
+    
     if (type != GB_VBLANK_TYPE_REPEAT) {
         if (configuration.blending_mode) {
             render_texture(active_pixel_buffer, previous_pixel_buffer);
@@ -775,12 +790,6 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
             render_texture(active_pixel_buffer, NULL);
         }
     }
-    
-    uint8_t *io_registers = GB_get_direct_access(gb, GB_DIRECT_ACCESS_IO, NULL, NULL);
-    WGB_update_hardware_values(&wgb, io_registers[GB_IO_SCX], io_registers[GB_IO_SCY],
-                                 io_registers[GB_IO_WX], io_registers[GB_IO_WY],
-                                 io_registers[GB_IO_LCDC] & 0x20);
-    WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode);
     
     do_rewind = rewind_down;
     
@@ -1187,7 +1196,7 @@ restart:;
         char wgb_path[strlen(filename) + 8];
         replace_extension(filename, strlen(filename), wgb_path, ".widegb");
         WGB_init_from_path(&wgb, wgb_path, (WGB_rgb_encode_callback_t) rgb_encode);
-        GB_set_bg_pixels_output(&gb, active_pixel_buffer);
+        GB_set_bg_pixels_output(&gb, bg_pixel_buffer);
         GB_set_rgb_encode_callback(&gb, rgb_encode);
         GB_set_rumble_callback(&gb, rumble);
         GB_set_rumble_mode(&gb, configuration.rumble_mode);
@@ -1332,6 +1341,18 @@ static void save_configuration(void)
 static void stop_recording(void)
 {
     GB_stop_audio_recording(&gb);
+}
+
+static void save_wide_gb(void)
+{
+    if (filename == NULL || !GB_is_inited(&gb) || wgb.active_scene == NULL) {
+        return;
+    }
+
+    size_t path_length = strlen(filename);
+    char save_path[path_length + 8];
+    replace_extension(filename, path_length, save_path, ".widegb");
+    WGB_save_to_path(&wgb, save_path, rgb_decode);
 }
 
 static bool get_arg_flag(const char *flag, int *argc, char **argv)
@@ -1562,6 +1583,7 @@ int main(int argc, char **argv)
     
     atexit(save_configuration);
     atexit(stop_recording);
+    atexit(save_wide_gb);
     
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);

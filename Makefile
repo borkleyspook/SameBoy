@@ -719,7 +719,7 @@ endif
 # Copy required DLL files for the Windows port
 $(BIN)/SDL/%.dll:
 	-@$(MKDIR) -p $(dir $@)
-	@$(eval MATCH := $(firstword $(wildcard $(LIB)/$(notdir $@))))
+	@$(eval MATCH := $(firstword $(shell where /R "$(LIB)" $(notdir $@) 2> $(NULL))))
 	cp "$(MATCH)" $@
 
 # Tester

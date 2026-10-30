@@ -45,10 +45,239 @@ static unsigned factor;
 
 static SDL_Surface *converted_background = NULL;
 
+/* WideGB compositing surfaces. They are created on demand and resized whenever
+   the window (or the scale) changes. */
+static SDL_Surface *wgb_surface = NULL;
+static SDL_Surface *wgb_screen_surface = NULL;
+static SDL_Surface *wgb_tile_surfaces[WIDE_GB_MAX_TILES];
+static SDL_Texture *wgb_texture = NULL;
+static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
+
 bool screen_manually_resized = false;
+
+static bool can_render_widescreen(void)
+{
+    return configuration.scaling_mode == GB_SDL_SCALING_WIDE_SCREEN &&
+           GB_is_inited(&gb) &&
+           GB_get_screen_width(&gb) == WIDE_GB_TILE_WIDTH &&
+           GB_get_screen_height(&gb) == WIDE_GB_TILE_HEIGHT;
+}
+
+static unsigned widescreen_scale(unsigned window_width, unsigned window_height)
+{
+    double x_factor = window_width / (double) WIDE_GB_TILE_WIDTH;
+    double y_factor = window_height / (double) WIDE_GB_TILE_HEIGHT;
+    double factor = x_factor < y_factor? x_factor : y_factor;
+    unsigned scale = (unsigned)(factor * 0.8);
+    if (scale == 0) {
+        scale = 1;
+    }
+    return scale;
+}
+
+static SDL_Surface *wgb_tile_surface(int index)
+{
+    if (index < 0 || index >= WIDE_GB_MAX_TILES) {
+        return NULL;
+    }
+    SDL_Surface *surface = wgb_tile_surfaces[index];
+    if (surface == NULL) {
+        surface = SDL_CreateRGBSurfaceWithFormat(0, WIDE_GB_TILE_WIDTH, WIDE_GB_TILE_HEIGHT,
+                                                 32, pixel_format->format);
+        wgb_tile_surfaces[index] = surface;
+    }
+    return surface;
+}
+
+/* Composes the visible WideGB tiles and the Game Boy screen into a surface
+   that covers the entire window. Everything is laid out in "screen-space"
+   (160x144 units) and then scaled up by `scale`, so resizing the window or
+   maximizing it never leaves stale/black regions behind. */
+static void render_widescreen(void *pixels)
+{
+    if (pixel_format == NULL) {
+        return;
+    }
+
+    int window_width, window_height;
+    SDL_GL_GetDrawableSize(window, &window_width, &window_height);
+    if (window_width <= 0 || window_height <= 0) {
+        return;
+    }
+
+    unsigned scale = widescreen_scale(window_width, window_height);
+
+    /* The Game Boy screen is centered in the window. Its top-left corner in
+       screen-space also doubles as the origin of the composited surface. */
+    int screen_offset_x = ((int)window_width - (int)(WIDE_GB_TILE_WIDTH * scale)) / 2;
+    int screen_offset_y = ((int)window_height - (int)(WIDE_GB_TILE_HEIGHT * scale)) / 2;
+    int surface_offset_x = -(screen_offset_x / (int)scale);
+    int surface_offset_y = -(screen_offset_y / (int)scale);
+
+    /* Always cover the whole window, rounding outwards. */
+    int surface_width = (window_width + (int)scale - 1) / (int)scale;
+    int surface_height = (window_height + (int)scale - 1) / (int)scale;
+    if (surface_width <= 0 || surface_height <= 0) {
+        return;
+    }
+
+    if (wgb_surface == NULL ||
+        wgb_surface->w != surface_width ||
+        wgb_surface->h != surface_height) {
+        if (wgb_surface) {
+            SDL_FreeSurface(wgb_surface);
+        }
+        wgb_surface = SDL_CreateRGBSurfaceWithFormat(0, surface_width, surface_height,
+                                                     32, pixel_format->format);
+        if (wgb_surface == NULL) {
+            return;
+        }
+    }
+
+    /* 1. Clear the canvas */
+    SDL_FillRect(wgb_surface, NULL, SDL_MapRGB(wgb_surface->format, 0, 0, 0));
+
+    /* 2. Draw every visible recorded tile */
+    if (wgb.active_scene) {
+        WGB_Rect visible_area = {
+            .x = surface_offset_x,
+            .y = surface_offset_y,
+            .w = surface_width,
+            .h = surface_height,
+        };
+        size_t tiles_count = WGB_tiles_count(&wgb);
+        for (size_t i = 0; i < tiles_count && i < WIDE_GB_MAX_TILES; i++) {
+            WGB_tile *tile = WGB_tile_at_index(&wgb, (int)i);
+            if (tile == NULL || tile->pixel_buffer == NULL) {
+                continue;
+            }
+            if (!WGB_is_tile_visible(&wgb, tile, visible_area)) {
+                continue;
+            }
+            SDL_Surface *tile_surface = wgb_tile_surface((int)i);
+            if (tile_surface == NULL) {
+                continue;
+            }
+            memcpy(tile_surface->pixels, tile->pixel_buffer,
+                   WIDE_GB_TILE_WIDTH * WIDE_GB_TILE_HEIGHT * sizeof (uint32_t));
+            WGB_Rect tile_rect = WGB_rect_for_tile(&wgb, tile);
+            SDL_Rect tile_destination = {
+                .x = tile_rect.x - surface_offset_x,
+                .y = tile_rect.y - surface_offset_y,
+                .w = WIDE_GB_TILE_WIDTH,
+                .h = WIDE_GB_TILE_HEIGHT,
+            };
+            SDL_BlitSurface(tile_surface, NULL, wgb_surface, &tile_destination);
+        }
+    }
+
+    /* 3. Draw the Game Boy screen on top of the tiles */
+    if (pixels == NULL && GB_is_inited(&gb)) {
+        pixels = GB_get_pixels_output(&gb);
+    }
+    if (pixels && wgb_screen_surface == NULL) {
+        wgb_screen_surface = SDL_CreateRGBSurfaceWithFormat(0, WIDE_GB_TILE_WIDTH,
+                                                            WIDE_GB_TILE_HEIGHT, 32,
+                                                            pixel_format->format);
+    }
+    if (pixels && wgb_screen_surface) {
+        memcpy(wgb_screen_surface->pixels, pixels,
+               WIDE_GB_TILE_WIDTH * WIDE_GB_TILE_HEIGHT * sizeof (uint32_t));
+    }
+    if (wgb_screen_surface && wgb_screen_surface->pixels) {
+        SDL_Rect screen_destination = {
+            .x = -surface_offset_x,
+            .y = -surface_offset_y,
+        };
+        bool draw_opaque_window = !wgb.window_enabled || WGB_is_window_covering_screen(&wgb, 6);
+
+        if (draw_opaque_window) {
+            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            SDL_BlitSurface(wgb_screen_surface, NULL, wgb_surface, &screen_destination);
+        }
+        else {
+            /* Draw the background area opaquely, then the window area
+               translucently so recorded tiles remain visible through it. */
+            WGB_Rect bg_rects[2], window_rect;
+            WGB_get_screen_layout(&wgb, &bg_rects[0], &bg_rects[1], &window_rect);
+
+            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            for (int i = 0; i < 2; i++) {
+                if (bg_rects[i].w > 0 && bg_rects[i].h > 0) {
+                    SDL_Rect destination = {
+                        .x = screen_destination.x + bg_rects[i].x,
+                        .y = screen_destination.y + bg_rects[i].y,
+                    };
+                    SDL_BlitSurface(wgb_screen_surface, (SDL_Rect *)&bg_rects[i],
+                                    wgb_surface, &destination);
+                }
+            }
+
+            if (window_rect.w > 0 && window_rect.h > 0) {
+                SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_BLEND);
+                SDL_SetSurfaceAlphaMod(wgb_screen_surface, 170);
+                SDL_Rect destination = {
+                    .x = screen_destination.x + window_rect.x,
+                    .y = screen_destination.y + window_rect.y,
+                };
+                SDL_BlitSurface(wgb_screen_surface, (SDL_Rect *)&window_rect,
+                                wgb_surface, &destination);
+                SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
+            }
+            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+        }
+    }
+
+    /* 4. Present the composited surface */
+    SDL_Rect destination = {
+        .x = 0,
+        .y = 0,
+        .w = surface_width * (int)scale,
+        .h = surface_height * (int)scale,
+    };
+
+    if (renderer) {
+        if (wgb_texture == NULL ||
+            wgb_texture_width != (unsigned)surface_width ||
+            wgb_texture_height != (unsigned)surface_height) {
+            if (wgb_texture) {
+                SDL_DestroyTexture(wgb_texture);
+            }
+            wgb_texture = SDL_CreateTexture(renderer, pixel_format->format,
+                                            SDL_TEXTUREACCESS_STREAMING,
+                                            surface_width, surface_height);
+            wgb_texture_width = surface_width;
+            wgb_texture_height = surface_height;
+        }
+        if (wgb_texture == NULL) {
+            return;
+        }
+        SDL_UpdateTexture(wgb_texture, NULL, wgb_surface->pixels, wgb_surface->pitch);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderSetViewport(renderer, NULL);
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, wgb_texture, NULL, &destination);
+        SDL_RenderPresent(renderer);
+    }
+    else {
+        glViewport(0, 0, window_width, window_height);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        render_bitmap_with_shader(&shader, wgb_surface->pixels, NULL,
+                                  surface_width, surface_height,
+                                  0, 0, destination.w, destination.h,
+                                  GB_FRAME_BLENDING_MODE_DISABLED);
+        SDL_GL_SwapWindow(window);
+    }
+}
 
 void render_texture(void *pixels,  void *previous)
 {
+    if (can_render_widescreen()) {
+        render_widescreen(pixels);
+        return;
+    }
+
     if (renderer) {
         if (pixels) {
             SDL_UpdateTexture(texture, NULL, pixels, GB_get_screen_width(&gb) * sizeof (uint32_t));
@@ -122,7 +351,13 @@ void update_viewport(void)
     double x_factor = win_width / (double) GB_get_screen_width(&gb);
     double y_factor = win_height / (double) GB_get_screen_height(&gb);
     
-    if (configuration.scaling_mode == GB_SDL_SCALING_INTEGER_FACTOR) {
+    if (configuration.scaling_mode == GB_SDL_SCALING_WIDE_SCREEN &&
+        GB_is_inited(&gb) &&
+        GB_get_screen_width(&gb) == WIDE_GB_TILE_WIDTH &&
+        GB_get_screen_height(&gb) == WIDE_GB_TILE_HEIGHT) {
+        x_factor = y_factor = widescreen_scale(win_width, win_height);
+    }
+    else if (configuration.scaling_mode == GB_SDL_SCALING_INTEGER_FACTOR) {
         x_factor = (unsigned)(x_factor);
         y_factor = (unsigned)(y_factor);
     }
@@ -1245,7 +1480,7 @@ static void enter_emulation_menu(unsigned index)
 
 static const char *current_scaling_mode(unsigned index)
 {
-    return GB_inline_const(const char *[], {"Fill Entire Window", "Retain Aspect Ratio", "Retain Integer Factor"})
+    return GB_inline_const(const char *[], {"Fill Entire Window", "Retain Aspect Ratio", "Retain Integer Factor", "Widescreen"})
         [configuration.scaling_mode];
 }
 
