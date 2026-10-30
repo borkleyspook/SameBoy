@@ -7,7 +7,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <SDL.h>
-#include <Core/gb.h>
+#include "Core/gb.h"
 #include "open_dialog/open_dialog.h"
 #include "utils.h"
 #include "gui.h"
@@ -776,10 +776,10 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         }
     }
     
-    /* WGB_update_hardware_values(&wgb, gb->registers[GB_IO_SCX], gb->registers[GB_IO_SCY],
-                                 gb->registers[GB_IO_WX], gb->registers[GB_IO_WY],
-                                 gb->registers[GB_IO_LCDC] & 0x20); */
-    /* WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode); */
+    WGB_update_hardware_values(&wgb, gb->io_registers[GB_IO_SCX], gb->io_registers[GB_IO_SCY],
+                                 gb->io_registers[GB_IO_WX], gb->io_registers[GB_IO_WY],
+                                 gb->io_registers[GB_IO_LCDC] & 0x20);
+    WGB_update_screen(&wgb, active_pixel_buffer, rgb_decode);
     
     do_rewind = rewind_down;
     
