@@ -54,6 +54,11 @@ static SDL_Texture *wgb_texture = NULL;
 static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
 static bool widescreen_rendering = false;
 
+/* Viewport scroll / zoom for big-world experience */
+int viewport_x = 0;
+int viewport_y = 0;
+int zoom_level = 100; /* percent, default 100 */
+
 bool screen_manually_resized = false;
 
 static bool can_render_widescreen(void)
@@ -69,7 +74,7 @@ static unsigned widescreen_scale(unsigned window_width, unsigned window_height)
     double x_factor = window_width / (double) WIDE_GB_TILE_WIDTH;
     double y_factor = window_height / (double) WIDE_GB_TILE_HEIGHT;
     double factor = x_factor < y_factor? x_factor : y_factor;
-    unsigned scale = (unsigned)(factor * 0.8);
+    unsigned scale = (unsigned)(factor * (zoom_level / 100.0) * 0.8);
     if (scale == 0) {
         scale = 1;
     }
@@ -116,8 +121,8 @@ static void render_widescreen(void *pixels)
        screen-space also doubles as the origin of the composited surface. */
     int screen_offset_x = ((int)window_width - (int)(WIDE_GB_TILE_WIDTH * scale)) / 2;
     int screen_offset_y = ((int)window_height - (int)(WIDE_GB_TILE_HEIGHT * scale)) / 2;
-    int surface_offset_x = -(screen_offset_x / (int)scale);
-    int surface_offset_y = -(screen_offset_y / (int)scale);
+    int surface_offset_x = -(screen_offset_x / (int)scale) + viewport_x;
+    int surface_offset_y = -(screen_offset_y / (int)scale) + viewport_y;
 
     /* Always cover the whole window, rounding outwards. */
     int surface_width = (window_width + (int)scale - 1) / (int)scale;
