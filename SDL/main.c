@@ -740,7 +740,7 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         WGB_update_hardware_values(&wgb, io_registers[GB_IO_SCX], io_registers[GB_IO_SCY],
                                      io_registers[GB_IO_WX] - 7, io_registers[GB_IO_WY],
                                      io_registers[GB_IO_LCDC] & 0x20);
-        WGB_update_screen(&wgb, bg_pixel_buffer, rgb_decode);
+        WGB_update_screen(&wgb, GB_get_pixels_output(gb), rgb_decode);
     }
 
     if (type != GB_VBLANK_TYPE_REPEAT) {
