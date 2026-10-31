@@ -762,15 +762,16 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     /* Viewport scroll / zoom for big-world experience */
     extern int viewport_x, viewport_y, zoom_level;
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
-    bool shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
-    if (shift) {
-        if (keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_A]) viewport_x += 8;
-        if (keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D]) viewport_x -= 8;
-        if (keys[SDL_SCANCODE_UP] || keys[SDL_SCANCODE_W]) viewport_y += 8;
-        if (keys[SDL_SCANCODE_DOWN] || keys[SDL_SCANCODE_S]) viewport_y -= 8;
-    }
-    if (keys[SDL_SCANCODE_Q]) zoom_level = (zoom_level - 10 < 50) ? 50 : zoom_level - 10;
-    if (keys[SDL_SCANCODE_E]) zoom_level = (zoom_level + 10 > 200) ? 200 : zoom_level + 10;
+    if (keys[SDL_SCANCODE_I]) viewport_y += 8;
+    if (keys[SDL_SCANCODE_K]) viewport_y -= 8;
+    if (keys[SDL_SCANCODE_J]) viewport_x += 8;
+    if (keys[SDL_SCANCODE_L]) viewport_x -= 8;
+    static bool q_prev = false, e_prev = false;
+    bool q_now = keys[SDL_SCANCODE_Q];
+    bool e_now = keys[SDL_SCANCODE_E];
+    if (q_now && !q_prev) zoom_level -= 10;
+    if (e_now && !e_prev) zoom_level += 10;
+    q_prev = q_now; e_prev = e_now;
     if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; }
 }
 
