@@ -44,9 +44,6 @@ static typeof(free) *free_function = NULL;
 static char *battery_save_path_ptr = NULL;
 static SDL_GLContext gl_context = NULL;
 static bool console_supported = false;
-static bool battery_dirty = false;
-static unsigned battery_timer = 0;
-
 bool uses_gl(void)
 {
     return gl_context;
@@ -722,35 +719,9 @@ static uint32_t gb_rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
     return SDL_MapRGB(pixel_format, r, g, b);
 }
 
-static void __attribute__((unused)) rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
+static void rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
 {
     SDL_GetRGB(encoded, pixel_format, (Uint8 *)r, (Uint8 *)g, (Uint8 *)b);
-}
-
-/* Debug helper: dump a 160x144 buffer as a binary PPM. Enabled only when
-   SAMEBoy_WGB_DUMP_BG is set, so it costs nothing in normal runs. */
-static void wgb_debug_dump_ppm(const char *prefix, unsigned index, const char *kind,
-                               const uint32_t *pixels)
-{
-    char path[1024];
-    snprintf(path, sizeof(path), "%s_%02u_%s.ppm", prefix, index, kind);
-    FILE *file = fopen(path, "wb");
-    if (file == NULL) {
-        return;
-    }
-    fprintf(file, "P6\n160 144\n255\n");
-    uint8_t row[160 * 3];
-    for (unsigned y = 0; y < 144; y++) {
-        for (unsigned x = 0; x < 160; x++) {
-            uint8_t r, g, b;
-            SDL_GetRGB(pixels[x + y * 160], pixel_format, &r, &g, &b);
-            row[x * 3 + 0] = r;
-            row[x * 3 + 1] = g;
-            row[x * 3 + 2] = b;
-        }
-        fwrite(row, 3, 160, file);
-    }
-    fclose(file);
 }
 
 static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
@@ -764,73 +735,14 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
         GB_set_clock_multiplier(gb, clock_mutliplier);
     }
     
-    if (rapid_a) {
-        rapid_a_count++;
-        GB_set_key_state(gb, GB_KEY_A, !(rapid_a_count & 2));
-    }
-    if (rapid_b) {
-        rapid_b_count++;
-        GB_set_key_state(gb, GB_KEY_B, !(rapid_b_count & 2));
-    }
-    
-    if (turbo_down) {
-        show_osd_text("Fast forward...");
-    }
-    else if (underclock_down) {
-        show_osd_text("Slow motion...");
-    }
-    else if (rewind_down) {
-        show_osd_text("Rewinding...");
-    }
-    
-    if (pending_screenshot) {
-        pending_screenshot = false;
-        save_screenshot();
-    }
-    
-    if (osd_countdown && configuration.osd) {
-        if (osd_countdown != 1) {
-            unsigned width = GB_get_screen_width(gb);
-            unsigned height = GB_get_screen_height(gb);
-            draw_text(active_pixel_buffer,
-                      width, height, 8, height - 8 - osd_text_lines * 12, osd_text,
-                      gb_rgb_encode(gb, 255, 255, 255), gb_rgb_encode(gb, 0, 0, 0),
-                      true);
-        }
-        osd_countdown--;
-    }
     if (type != GB_VBLANK_TYPE_REPEAT && type != GB_VBLANK_TYPE_LCD_OFF) {
-        /* Notify WideGB of the frame that was just finished, before the
-           pixel buffers are swapped. It needs the background pixels (not the
-           composited display buffer) so window/sprites are not recorded. */
         uint8_t *io_registers = GB_get_direct_access(gb, GB_DIRECT_ACCESS_IO, NULL, NULL);
         WGB_update_hardware_values(&wgb, io_registers[GB_IO_SCX], io_registers[GB_IO_SCY],
                                      io_registers[GB_IO_WX] - 7, io_registers[GB_IO_WY],
                                      io_registers[GB_IO_LCDC] & 0x20);
         WGB_update_screen(&wgb, bg_pixel_buffer, rgb_decode);
-
-        {
-            static unsigned wgb_debug_counter = 0;
-            const char *wgb_debug_prefix = getenv("SAMEBoy_WGB_DUMP_BG");
-            if (wgb_debug_prefix && wgb_debug_prefix[0] && wgb_debug_counter < 60) {
-                if ((wgb_debug_counter % 6) == 0) {
-                    unsigned dump_index = wgb_debug_counter / 6;
-                    wgb_debug_dump_ppm(wgb_debug_prefix, dump_index, "bg", bg_pixel_buffer);
-                    wgb_debug_dump_ppm(wgb_debug_prefix, dump_index, "disp", active_pixel_buffer);
-                    fprintf(stderr, "wgbdebug %u scene=%d scroll=%d,%d tiles=%zu window=%d "
-                                    "rect=%d,%d,%d,%d sgb=%d\n",
-                            dump_index, wgb.active_scene ? wgb.active_scene->id : -1,
-                            wgb.active_scene ? wgb.active_scene->scroll.x : 0,
-                            wgb.active_scene ? wgb.active_scene->scroll.y : 0,
-                            wgb.active_scene ? wgb.active_scene->tiles_count : 0,
-                            wgb.window_enabled, wgb.window_rect.x, wgb.window_rect.y,
-                            wgb.window_rect.w, wgb.window_rect.h, GB_is_sgb(gb));
-                }
-                wgb_debug_counter++;
-            }
-        }
     }
-    
+
     if (type != GB_VBLANK_TYPE_REPEAT) {
         if (configuration.blending_mode) {
             render_texture(active_pixel_buffer, previous_pixel_buffer);
@@ -843,21 +755,8 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
             render_texture(active_pixel_buffer, NULL);
         }
     }
-    
+
     do_rewind = rewind_down;
-    
-    battery_timer++;
-    if (battery_timer == 15) {
-        battery_timer = 0;
-        
-        if (battery_dirty && !GB_get_battery_dirty(gb)) {
-            GB_save_battery(gb, battery_save_path_ptr);
-        }
-        
-        battery_dirty = GB_get_battery_dirty(gb);
-        GB_clear_battery_dirty(gb);
-    }
-    
     handle_events(gb);
 }
 
