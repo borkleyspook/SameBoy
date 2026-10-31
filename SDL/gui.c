@@ -85,6 +85,10 @@ static SDL_Surface *wgb_tile_surface(int index)
     if (surface == NULL) {
         surface = SDL_CreateRGBSurfaceWithFormat(0, WIDE_GB_TILE_WIDTH, WIDE_GB_TILE_HEIGHT,
                                                  32, pixel_format->format);
+        if (surface == NULL) return NULL;
+        SDL_LockSurface(surface);
+        memset(surface->pixels, 0, surface->pitch * WIDE_GB_TILE_HEIGHT);
+        SDL_UnlockSurface(surface);
         wgb_tile_surfaces[index] = surface;
     }
     return surface;
@@ -159,8 +163,10 @@ static void render_widescreen(void *pixels)
             if (tile_surface == NULL) {
                 continue;
             }
+            SDL_LockSurface(tile_surface);
             memcpy(tile_surface->pixels, tile->pixel_buffer,
                    WIDE_GB_TILE_WIDTH * WIDE_GB_TILE_HEIGHT * sizeof (uint32_t));
+            SDL_UnlockSurface(tile_surface);
             WGB_Rect tile_rect = WGB_rect_for_tile(&wgb, tile);
             SDL_Rect tile_destination = {
                 .x = tile_rect.x - surface_offset_x,

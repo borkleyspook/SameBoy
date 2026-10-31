@@ -712,7 +712,12 @@ static void handle_events(GB_gameboy_t *gb)
     }
 }
 
-static uint32_t rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
+static uint32_t rgb_encode(uint8_t r, uint8_t g, uint8_t b)
+{
+    return SDL_MapRGB(pixel_format, r, g, b);
+}
+
+static uint32_t gb_rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
 {
     return SDL_MapRGB(pixel_format, r, g, b);
 }
@@ -720,14 +725,6 @@ static uint32_t rgb_encode(GB_gameboy_t *gb, uint8_t r, uint8_t g, uint8_t b)
 static void __attribute__((unused)) rgb_decode(uint32_t encoded, uint8_t *r, uint8_t *g, uint8_t *b)
 {
     SDL_GetRGB(encoded, pixel_format, (Uint8 *)r, (Uint8 *)g, (Uint8 *)b);
-}
-
-/* WideGB's encode callback takes exactly (r, g, b), unlike SameBoy's
-   4-argument rgb_encode. Casting the latter to the former shifts every
-   argument (and leaves blue uninitialized), so use a real wrapper. */
-static uint32_t wgb_rgb_encode(uint8_t r, uint8_t g, uint8_t b)
-{
-    return SDL_MapRGB(pixel_format, r, g, b);
 }
 
 /* Debug helper: dump a 160x144 buffer as a binary PPM. Enabled only when
@@ -797,7 +794,7 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
             unsigned height = GB_get_screen_height(gb);
             draw_text(active_pixel_buffer,
                       width, height, 8, height - 8 - osd_text_lines * 12, osd_text,
-                      rgb_encode(gb, 255, 255, 255), rgb_encode(gb, 0, 0, 0),
+                      gb_rgb_encode(gb, 255, 255, 255), gb_rgb_encode(gb, 0, 0, 0),
                       true);
         }
         osd_countdown--;
@@ -827,7 +824,7 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
                             wgb.active_scene ? wgb.active_scene->scroll.y : 0,
                             wgb.active_scene ? wgb.active_scene->tiles_count : 0,
                             wgb.window_enabled, wgb.window_rect.x, wgb.window_rect.y,
-                            wgb.window_rect.w, wgb.window_rect.h, gb->sgb != NULL);
+                            wgb.window_rect.w, wgb.window_rect.h, GB_is_sgb(gb));
                 }
                 wgb_debug_counter++;
             }
@@ -1251,9 +1248,9 @@ restart:;
         GB_set_pixels_output(&gb, active_pixel_buffer);
         char wgb_path[strlen(filename) + 8];
         replace_extension(filename, strlen(filename), wgb_path, ".widegb");
-        WGB_init_from_path(&wgb, wgb_path, wgb_rgb_encode);
+        WGB_init_from_path(&wgb, wgb_path, rgb_encode);
         GB_set_bg_pixels_output(&gb, bg_pixel_buffer);
-        GB_set_rgb_encode_callback(&gb, rgb_encode);
+        GB_set_rgb_encode_callback(&gb, gb_rgb_encode);
         GB_set_rumble_callback(&gb, rumble);
         GB_set_rumble_mode(&gb, configuration.rumble_mode);
         GB_set_sample_rate(&gb, GB_audio_get_frequency());
