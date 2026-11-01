@@ -775,23 +775,61 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; }
 
     /* Debug mode: F1 toggles, 1-9 switch scenes */
-    static bool f1_prev = false;
-    bool f1_now = keys[SDL_SCANCODE_F1];
-    if (f1_now && !f1_prev) {
-        wgb_debug_mode = !wgb_debug_mode;
-        fprintf(stderr, "wgb debug %s\n", wgb_debug_mode ? "on" : "off");
+    static bool plus_prev = false, minus_prev = false;
+    bool plus_now = keys[SDL_SCANCODE_KP_PLUS] || keys[SDL_SCANCODE_EQUALS];
+    bool minus_now = keys[SDL_SCANCODE_KP_MINUS] || keys[SDL_SCANCODE_MINUS];
+    if (plus_now && !plus_prev && wgb.active_scene) {
+        int start = wgb.active_scene->id;
+        for (int i = start + 1; i < 999; i++) {
+            if (WGB_set_active_scene_id(&wgb, i)) { fprintf(stderr, "wgb: shifted to scene %d\n", i); break; }
+        }
     }
-    f1_prev = f1_now;
+    if (minus_now && !minus_prev && wgb.active_scene) {
+        int start = wgb.active_scene->id;
+        for (int i = start - 1; i > 0; i--) {
+            if (WGB_set_active_scene_id(&wgb, i)) { fprintf(stderr, "wgb: shifted to scene %d\n", i); break; }
+        }
+    }
+    plus_prev = plus_now; minus_prev = minus_now;
+
+    /* Scene switching: 1-9 jump directly; + / - cycle through valid scenes */
     if (wgb.active_scene) {
-        if (keys[SDL_SCANCODE_1]) { WGB_set_active_scene_id(&wgb, 1); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_2]) { WGB_set_active_scene_id(&wgb, 2); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_3]) { WGB_set_active_scene_id(&wgb, 3); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_4]) { WGB_set_active_scene_id(&wgb, 4); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_5]) { WGB_set_active_scene_id(&wgb, 5); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_6]) { WGB_set_active_scene_id(&wgb, 6); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_7]) { WGB_set_active_scene_id(&wgb, 7); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_8]) { WGB_set_active_scene_id(&wgb, 8); WGB_debug_scene_info(&wgb); }
-        if (keys[SDL_SCANCODE_9]) { WGB_set_active_scene_id(&wgb, 9); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_1]) {
+            if (!WGB_set_active_scene_id(&wgb, 1)) { fprintf(stderr, "wgb: scene 1 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 1\n"); }
+        }
+        if (keys[SDL_SCANCODE_2]) {
+            if (!WGB_set_active_scene_id(&wgb, 2)) { fprintf(stderr, "wgb: scene 2 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 2\n"); }
+        }
+        if (keys[SDL_SCANCODE_3]) {
+            if (!WGB_set_active_scene_id(&wgb, 3)) { fprintf(stderr, "wgb: scene 3 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 3\n"); }
+        }
+        if (keys[SDL_SCANCODE_4]) {
+            if (!WGB_set_active_scene_id(&wgb, 4)) { fprintf(stderr, "wgb: scene 4 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 4\n"); }
+        }
+        if (keys[SDL_SCANCODE_5]) {
+            if (!WGB_set_active_scene_id(&wgb, 5)) { fprintf(stderr, "wgb: scene 5 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 5\n"); }
+        }
+        if (keys[SDL_SCANCODE_6]) {
+            if (!WGB_set_active_scene_id(&wgb, 6)) { fprintf(stderr, "wgb: scene 6 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 6\n"); }
+        }
+        if (keys[SDL_SCANCODE_7]) {
+            if (!WGB_set_active_scene_id(&wgb, 7)) { fprintf(stderr, "wgb: scene 7 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 7\n"); }
+        }
+        if (keys[SDL_SCANCODE_8]) {
+            if (!WGB_set_active_scene_id(&wgb, 8)) { fprintf(stderr, "wgb: scene 8 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 8\n"); }
+        }
+        if (keys[SDL_SCANCODE_9]) {
+            if (!WGB_set_active_scene_id(&wgb, 9)) { fprintf(stderr, "wgb: scene 9 not found\n"); }
+            else { fprintf(stderr, "wgb: switched to scene 9\n"); }
+        }
     }
 }
 
