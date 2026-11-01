@@ -760,7 +760,7 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     handle_events(gb);
 
     /* Viewport scroll / zoom for big-world experience */
-    extern int viewport_x, viewport_y, zoom_level;
+    extern int viewport_x, viewport_y, zoom_level, bg_align_x, bg_align_y;
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
     if (keys[SDL_SCANCODE_I]) viewport_y += 8;
     if (keys[SDL_SCANCODE_K]) viewport_y -= 8;
@@ -772,7 +772,24 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     if (q_now && !q_prev) zoom_level -= 10;
     if (e_now && !e_prev) zoom_level += 10;
     q_prev = q_now; e_prev = e_now;
-    if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; }
+    /* Toggle 50% transparency overlay */
+    static bool t_prev = false;
+    bool t_now = keys[SDL_SCANCODE_T];
+    if (t_now && !t_prev) { extern bool wgb_transparent_mode; wgb_transparent_mode = !wgb_transparent_mode; fprintf(stderr, "wgb transparent %s\n", wgb_transparent_mode ? "on" : "off"); }
+    t_prev = t_now;
+    if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; bg_align_x = 0; bg_align_y = 0; }
+
+    /* Manual tile-alignment of gameplay vs background tiles (snap by 8 px) */
+    static bool num4_prev = false, num6_prev = false, num8_prev = false, num2_prev = false;
+    bool num4_now = keys[SDL_SCANCODE_KP_4];
+    bool num6_now = keys[SDL_SCANCODE_KP_6];
+    bool num8_now = keys[SDL_SCANCODE_KP_8];
+    bool num2_now = keys[SDL_SCANCODE_KP_2];
+    if (num4_now && !num4_prev) bg_align_x += 8;  /* snap right */
+    if (num6_now && !num6_prev) bg_align_x -= 8;  /* snap left */
+    if (num8_now && !num8_prev) bg_align_y += 8;  /* snap down */
+    if (num2_now && !num2_prev) bg_align_y -= 8;  /* snap up */
+    num4_prev = num4_now; num6_prev = num6_now; num8_prev = num8_now; num2_prev = num2_now;
 
     /* Debug mode: F1 toggles, 1-9 switch scenes */
     static bool plus_prev = false, minus_prev = false;

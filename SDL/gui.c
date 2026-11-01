@@ -54,11 +54,16 @@ static SDL_Texture *wgb_texture = NULL;
 static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
 static bool widescreen_rendering = false;
 bool wgb_debug_mode = false;
+bool wgb_transparent_mode = false;
 
 /* Viewport scroll / zoom for big-world experience */
 int viewport_x = 0;
 int viewport_y = 0;
 int zoom_level = 100; /* percent, default 100 */
+
+/* Manual tile-alignment of gameplay window vs tile background */
+int bg_align_x = 0;
+int bg_align_y = 0;
 
 bool screen_manually_resized = false;
 
@@ -199,14 +204,23 @@ static void render_widescreen(void *pixels)
     }
     if (wgb_screen_surface && wgb_screen_surface->pixels) {
         SDL_Rect screen_destination = {
-            .x = -surface_offset_x,
-            .y = -surface_offset_y,
+            .x = -surface_offset_x + bg_align_x,
+            .y = -surface_offset_y + bg_align_y,
         };
         bool draw_opaque_window = !wgb.window_enabled || WGB_is_window_covering_screen(&wgb, 6);
 
-        if (draw_opaque_window) {
+        if (draw_opaque_window && !wgb_transparent_mode) {
             SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
             SDL_BlitSurface(wgb_screen_surface, NULL, wgb_surface, &screen_destination);
+        }
+        else if (wgb_transparent_mode) {
+            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_BLEND);
+            SDL_SetSurfaceAlphaMod(wgb_screen_surface, 128);
+            SDL_BlitSurface(wgb_screen_surface, NULL, wgb_surface, &screen_destination);
+            SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
+        } else {
+            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
         }
         else {
             /* Draw the background area opaquely, then the window area
@@ -214,7 +228,12 @@ static void render_widescreen(void *pixels)
             WGB_Rect bg_rects[2], window_rect;
             WGB_get_screen_layout(&wgb, &bg_rects[0], &bg_rects[1], &window_rect);
 
-            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            if (wgb_transparent_mode) {
+                SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_BLEND);
+                SDL_SetSurfaceAlphaMod(wgb_screen_surface, 128);
+            } else {
+                SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            }
             for (int i = 0; i < 2; i++) {
                 if (bg_rects[i].w > 0 && bg_rects[i].h > 0) {
                     SDL_Rect destination = {
@@ -238,6 +257,7 @@ static void render_widescreen(void *pixels)
                 SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
             }
             SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
+            SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
         }
     }
 
