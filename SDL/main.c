@@ -777,6 +777,10 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     bool t_now = keys[SDL_SCANCODE_T];
     if (t_now && !t_prev) { extern bool wgb_transparent_mode; wgb_transparent_mode = !wgb_transparent_mode; fprintf(stderr, "wgb transparent %s\n", wgb_transparent_mode ? "on" : "off"); }
     t_prev = t_now;
+    static bool p_prev = false;
+    bool p_now = keys[SDL_SCANCODE_P];
+    if (p_now && !p_prev) { extern bool wgb_dump_active; wgb_dump_active = !wgb_dump_active; fprintf(stderr, "wgb dump %s (path: %s)\n", wgb_dump_active ? "ON" : "OFF", wgb_dump_active ? "C:\\Users\\User\\dumps\\dump" : "env/set"); }
+    p_prev = p_now;
     if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; bg_align_x = 0; bg_align_y = 0; }
 
     /* Manual tile-alignment of gameplay vs background tiles (snap by 8 px) */

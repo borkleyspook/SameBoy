@@ -55,6 +55,7 @@ static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
 static bool widescreen_rendering = false;
 bool wgb_debug_mode = false;
 bool wgb_transparent_mode = false;
+bool wgb_dump_active = false;
 
 /* Viewport scroll / zoom for big-world experience */
 int viewport_x = 0;
@@ -219,10 +220,6 @@ static void render_widescreen(void *pixels)
             SDL_BlitSurface(wgb_screen_surface, NULL, wgb_surface, &screen_destination);
             SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
         } else {
-            SDL_SetSurfaceBlendMode(wgb_screen_surface, SDL_BLENDMODE_NONE);
-            SDL_SetSurfaceAlphaMod(wgb_screen_surface, 255);
-        }
-        else {
             /* Draw the background area opaquely, then the window area
                translucently so recorded tiles remain visible through it. */
             WGB_Rect bg_rects[2], window_rect;
@@ -287,11 +284,12 @@ static void render_widescreen(void *pixels)
                   false);
     }
 
-    /* Debug aid: set SAMEBoy_WGB_DUMP=<prefix> to dump composed frames. */
+    /* Debug aid: dump composed frames. Toggle with P (wgb_dump_active). */
     {
         static unsigned dump_count = 0;
         static unsigned frame_count = 0;
-        const char *dump_prefix = getenv("SAMEBoy_WGB_DUMP");
+        const char *env_prefix = getenv("SAMEBoy_WGB_DUMP");
+        const char *dump_prefix = (env_prefix && env_prefix[0]) ? env_prefix : (wgb_dump_active ? "C:\\Users\\User\\dumps\\dump" : NULL);
         frame_count++;
         if (dump_prefix && dump_prefix[0] && dump_count < 64 && (frame_count % 120) == 0) {
             char dump_path[1024];
