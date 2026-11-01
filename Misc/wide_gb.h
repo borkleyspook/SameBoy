@@ -90,6 +90,8 @@ typedef struct {
     time_t created_at;
 } WGB_scene;
 
+// ... existing code ...
+
 typedef uint64_t WGB_exact_hash;
 typedef uint64_t WGB_perceptual_hash;
 
@@ -209,6 +211,14 @@ void WGB_get_screen_layout(wide_gb *wgb, WGB_Rect *bg_rect1, WGB_Rect *bg_rect2,
 // entirerly overlapping the screen.
 
 bool WGB_is_window_covering_screen(wide_gb *wgb, unsigned int tolered_pixels);
+
+/*---------------- Debug / Scene switching -------------------------------*/
+
+// Set the active scene by its ID. Returns true if scene was found and switched.
+bool WGB_set_active_scene_id(wide_gb *wgb, int scene_id);
+
+// Print current scene info to stderr (scene ID, scroll, tiles count, etc.)
+void WGB_debug_scene_info(wide_gb *wgb);
 
 /*---------------- Geometry helpers --------------------------------------*/
 

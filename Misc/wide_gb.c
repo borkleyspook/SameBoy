@@ -685,6 +685,29 @@ bool WGB_is_window_covering_screen(wide_gb *wgb, unsigned int tolered_pixels)
     }
 }
 
+/*---------------- Debug / Scene switching -------------------------------*/
+
+bool WGB_set_active_scene_id(wide_gb *wgb, int scene_id)
+{
+    for (int i = 0; i < wgb->scenes_count; i++) {
+        if (wgb->scenes[i].id == scene_id && wgb->scenes[i].id != WGB_SCENE_DELETED) {
+            WGB_make_scene_active(wgb, &wgb->scenes[i]);
+            return true;
+        }
+    }
+    return false;
+}
+
+void WGB_debug_scene_info(wide_gb *wgb)
+{
+    fprintf(stderr, "wgb scene id=%d scroll=%d,%d tiles=%zu scenes=%zu\n",
+            wgb->active_scene ? wgb->active_scene->id : -1,
+            wgb->active_scene ? wgb->active_scene->scroll.x : -1,
+            wgb->active_scene ? wgb->active_scene->scroll.y : -1,
+            wgb->active_scene ? wgb->active_scene->tiles_count : 0,
+            wgb->scenes_count);
+}
+
 /*---------------- Frame hashing helpers -------------------------------*/
 
 // Compute an exact hash of a frame. This is used to identify if a frame belongs

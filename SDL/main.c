@@ -773,6 +773,26 @@ static void vblank(GB_gameboy_t *gb, GB_vblank_type_t type)
     if (e_now && !e_prev) zoom_level += 10;
     q_prev = q_now; e_prev = e_now;
     if (keys[SDL_SCANCODE_R]) { viewport_x = 0; viewport_y = 0; zoom_level = 100; }
+
+    /* Debug mode: F1 toggles, 1-9 switch scenes */
+    static bool f1_prev = false;
+    bool f1_now = keys[SDL_SCANCODE_F1];
+    if (f1_now && !f1_prev) {
+        wgb_debug_mode = !wgb_debug_mode;
+        fprintf(stderr, "wgb debug %s\n", wgb_debug_mode ? "on" : "off");
+    }
+    f1_prev = f1_now;
+    if (wgb.active_scene) {
+        if (keys[SDL_SCANCODE_1]) { WGB_set_active_scene_id(&wgb, 1); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_2]) { WGB_set_active_scene_id(&wgb, 2); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_3]) { WGB_set_active_scene_id(&wgb, 3); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_4]) { WGB_set_active_scene_id(&wgb, 4); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_5]) { WGB_set_active_scene_id(&wgb, 5); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_6]) { WGB_set_active_scene_id(&wgb, 6); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_7]) { WGB_set_active_scene_id(&wgb, 7); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_8]) { WGB_set_active_scene_id(&wgb, 8); WGB_debug_scene_info(&wgb); }
+        if (keys[SDL_SCANCODE_9]) { WGB_set_active_scene_id(&wgb, 9); WGB_debug_scene_info(&wgb); }
+    }
 }
 
 static void rumble(GB_gameboy_t *gb, double amp)

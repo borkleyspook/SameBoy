@@ -18,6 +18,7 @@
 
 extern GB_gameboy_t gb;
 extern wide_gb wgb;
+extern bool wgb_debug_mode;
 
 extern SDL_Window *window;
 extern SDL_Renderer *renderer;

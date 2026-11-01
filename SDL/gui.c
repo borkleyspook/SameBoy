@@ -53,6 +53,7 @@ static SDL_Surface *wgb_tile_surfaces[WIDE_GB_MAX_TILES];
 static SDL_Texture *wgb_texture = NULL;
 static unsigned wgb_texture_width = 0, wgb_texture_height = 0;
 static bool widescreen_rendering = false;
+bool wgb_debug_mode = false;
 
 /* Viewport scroll / zoom for big-world experience */
 int viewport_x = 0;
@@ -247,6 +248,24 @@ static void render_widescreen(void *pixels)
         .w = surface_width * (int)scale,
         .h = surface_height * (int)scale,
     };
+
+    /* Debug overlay: show scene info */
+    if (wgb_debug_mode && wgb_surface) {
+        char debug_buf[256];
+        snprintf(debug_buf, sizeof(debug_buf),
+            "Scene: %d | Scroll: %d,%d | Tiles: %zu | Scenes: %zu | Viewport: %d,%d | Zoom: %d%%",
+            wgb.active_scene ? wgb.active_scene->id : -1,
+            wgb.active_scene ? wgb.active_scene->scroll.x : 0,
+            wgb.active_scene ? wgb.active_scene->scroll.y : 0,
+            wgb.active_scene ? wgb.active_scene->tiles_count : 0,
+            wgb.scenes_count,
+            viewport_x, viewport_y, zoom_level);
+        draw_text((uint32_t *)wgb_surface->pixels, wgb_surface->w, wgb_surface->h,
+                  8, 8, debug_buf,
+                  SDL_MapRGB(wgb_surface->format, 255, 255, 255),
+                  SDL_MapRGB(wgb_surface->format, 0, 0, 0),
+                  false);
+    }
 
     /* Debug aid: set SAMEBoy_WGB_DUMP=<prefix> to dump composed frames. */
     {
